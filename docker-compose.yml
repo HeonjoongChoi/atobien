@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  atobien:
+    build: .
+    image: atobien_rest_api
+    container_name: atobien_rest_api
+    command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - 8000:8000
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/usr/src/app/
+    depends_on:
+      - db
+      - redis
+
+  celery:
+    container_name: celery_atobien
+    build: .
+    command: "celery -A apps worker --loglevel=DEBUG"
+    environment:
+      - DEBUG=1
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/usr/src/app/
+    depends_on:
+      - atobien
+      - redis
+    links:
+      - redis:redis
+
+  db:
+    image: postgres:12
+    container_name: postgres_atobien
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=thinkforbl
+    ports:
+      - 5432:5432
+
+  redis:
+    container_name: redis_atobien
+    image: redis:alpine
+    command: "redis-server --port 6379"
+    restart: always
+    ports:
+      - 6379:6379
